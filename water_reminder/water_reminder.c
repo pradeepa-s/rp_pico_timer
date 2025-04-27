@@ -1,22 +1,30 @@
+#include <stdio.h>
 #include "pico/stdlib.h"
 #include "debug_messages.h"
 
+#define ONE_SECOND_MS  (1000)
 
-static repeating_timer_t one_second_timer;
+static repeating_timer_t debug_messages_timer;
 
-static bool one_second_timer_cb(repeating_timer_t *rt);
+static bool debug_messages_timer_cb(repeating_timer_t *rt);
 
 int main()
 {
     stdio_init_all();
 
-    bool success = add_repeating_timer_ms(1000, one_second_timer_cb, NULL, &one_second_timer);
+    bool success = add_repeating_timer_ms(ONE_SECOND_MS, debug_messages_timer_cb, NULL, &debug_messages_timer);
+
+    if (!success) {
+        printf("ERROR: Failed to create debug messages timer.");
+    }
+
     while (true) {
+        check_for_messages();
     }
 }
 
 
-bool one_second_timer_cb(repeating_timer_t *rt)
+bool debug_messages_timer_cb(repeating_timer_t *rt)
 {
     debug_msg_flush_count++;
 }

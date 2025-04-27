@@ -44,9 +44,11 @@ pico_set_program_version(water_reminder "0.1")
 pico_enable_stdio_uart(water_reminder 1)
 pico_enable_stdio_usb(water_reminder 0)
 
+add_subdirectory(src)
+
 # Add the standard library to the build
 target_link_libraries(water_reminder
-        pico_stdlib)
+        pico_stdlib Application)
 
 # Add the standard include files to the build
 target_include_directories(water_reminder PRIVATE
