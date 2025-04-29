@@ -1,0 +1,3 @@
+[submodule "water_reminder/lvgl"]
+	path = water_reminder/lvgl
+	url = https://github.com/lvgl/lvgl.git
