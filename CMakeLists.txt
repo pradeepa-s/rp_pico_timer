@@ -46,6 +46,11 @@ pico_enable_stdio_usb(water_reminder 0)
 
 add_subdirectory(src)
 
+set(LV_CONF_PATH ${CMAKE_SOURCE_DIR}/lvgl/lv_conf.h)
+set(LV_CONF_BUILD_DISABLE_EXAMPLES ON)
+set(LV_CONF_BUILD_DISABLE_DEMOS ON)
+add_subdirectory(lvgl/lvgl)
+
 # Add the standard library to the build
 target_link_libraries(water_reminder
         pico_stdlib Application)

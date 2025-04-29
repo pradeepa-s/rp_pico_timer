@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "debug_messages.h"
+#include "display_framework.h"
 
 #define ONE_SECOND_MS  (1000)
 
@@ -13,7 +14,7 @@ int main()
     stdio_init_all();
 
     {
-        const bool success = initialise_display_framework();
+        const bool success = (initialise_display_framework() == 0);
         if (!success) {
             printf("ERROR: Failed to initialise display framework.");
         }
