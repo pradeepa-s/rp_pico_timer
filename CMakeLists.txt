@@ -62,7 +62,7 @@ target_include_directories(water_reminder PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(water_reminder 
-        
+        pico_cyw43_arch_none
         )
 
 pico_add_extra_outputs(water_reminder)

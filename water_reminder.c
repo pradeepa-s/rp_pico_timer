@@ -14,7 +14,7 @@ int main()
     stdio_init_all();
 
     {
-        const bool success = (initialise_display_framework() == 0);
+        const bool success = (initialise_gui() == 0);
         if (!success) {
             printf("ERROR: Failed to initialise display framework.");
         }
