@@ -38,7 +38,8 @@
     "raspberry-pi-pico.ninjaPath": "${HOME}/.pico-sdk/ninja/v1.12.1/ninja",
     "files.associations": {
         "debug_messages.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "tick_count.h": "c"
     },
     "search.useIgnoreFiles": true
 }
