@@ -6,6 +6,7 @@
 #include "pico/time.h"
 #include "pins.h"
 #include "tick_count.h"
+#include "ui_properties.h"
 
 
 static const bool LCD_CMD = false;
@@ -89,7 +90,7 @@ static void send_lcd_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size
 
     gpio_put(GPIO_LCD_DCX, LCD_CMD);
     gpio_put(GPIO_SPI0_CSn, false);
-    // spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     spi_write_blocking(spi0, cmd, cmd_size);
     
     if (param)
@@ -113,14 +114,18 @@ static void send_lcd_data(lv_display_t *disp, const uint8_t *cmd, size_t cmd_siz
     gpio_put(GPIO_LCD_DCX, LCD_CMD);
     gpio_put(GPIO_SPI0_CSn, false);
     pending_xfer = true;
-    // spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     spi_write_blocking(spi0, cmd, cmd_size);
     
     if (param)
     {
-        // spi_set_format(spi0, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_LSB_FIRST);
+        // The data write is alwways 16 bits.
+        // The data transfer is MSB first. Refer 8.8.42
+        uint16_t* data = (uint16_t*)param;
+        size_t data_size = param_size / 2;
+        spi_set_format(spi0, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
         gpio_put(GPIO_LCD_DCX, LCD_DATA);
-        spi_write_blocking(spi0, param, param_size);
+        spi_write16_blocking(spi0, data, data_size);
     }
 
     gpio_put(GPIO_SPI0_CSn, true);
@@ -161,21 +166,34 @@ static void initialise_lvgl_framework()
 
 static void ui_init(lv_display_t *disp)
 {
-    lv_obj_t *obj;
-
-    /* set screen background to white */
+    /* set screen background to dark gray */
     lv_obj_t *scr = lv_screen_active();
-    lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x1A1A1A), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_100, 0);
 
-    /* create label */
-    obj = lv_label_create(scr);
-    lv_obj_set_align(obj, LV_ALIGN_CENTER);
-    lv_obj_set_height(obj, LV_SIZE_CONTENT);
-    lv_obj_set_width(obj, LV_SIZE_CONTENT);
-    lv_obj_set_style_text_font(obj, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(obj, lv_color_black(), 0);
-    lv_label_set_text(obj, "Hello World!");
+    lv_obj_t *label_timer;
+    /* create Timer label */
+    label_timer = lv_label_create(scr);
+    lv_label_set_text(label_timer, "Timer");
+    lv_obj_set_style_text_color(label_timer, lv_color_white(), 0);
+    lv_obj_set_style_text_font(label_timer, &lv_font_montserrat_28, 0);
+    lv_obj_set_height(label_timer, LV_SIZE_CONTENT);
+    lv_obj_set_width(label_timer, LV_SIZE_CONTENT);
+    lv_obj_update_layout(label_timer);
+    lv_coord_t height = lv_obj_get_height(label_timer);
+    lv_obj_align(label_timer, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 52 - (height / 2));
+
+    lv_obj_t *label_clock;
+    /* create Clock label */
+    label_clock = lv_label_create(scr);
+    lv_label_set_text(label_clock, "00:00");
+    lv_obj_set_style_text_color(label_clock, lv_color_white(), 0);
+    lv_obj_set_style_text_font(label_clock, &lv_font_montserrat_46, 0);
+    lv_obj_set_height(label_clock, LV_SIZE_CONTENT);
+    lv_obj_set_width(label_clock, LV_SIZE_CONTENT);
+    lv_obj_update_layout(label_clock);
+    height = lv_obj_get_height(label_clock);
+    lv_obj_align(label_clock, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 124 - (height / 2));
 }
 
 int initialise_gui()
