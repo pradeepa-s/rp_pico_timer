@@ -20,6 +20,11 @@ static lv_display_t *lcd_disp = NULL;
 static const uint32_t LCD_H_RES = 240;
 static const uint32_t LCD_V_RES = 320;
 
+static absolute_time_t prev_time = 0;
+static uint32_t time_sec = 0;
+
+static lv_obj_t *label_clock;
+
 #ifdef ENABLE_REG_READ_FUNC
 // Can use this function to read register values for debugging.
 void read_register(void)
@@ -171,9 +176,8 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x1A1A1A), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_100, 0);
 
-    lv_obj_t *label_timer;
     /* create Timer label */
-    label_timer = lv_label_create(scr);
+    lv_obj_t *label_timer = lv_label_create(scr);
     lv_label_set_text(label_timer, "Timer");
     lv_obj_set_style_text_color(label_timer, lv_color_white(), 0);
     lv_obj_set_style_text_font(label_timer, &lv_font_montserrat_28, 0);
@@ -183,7 +187,6 @@ static void ui_init(lv_display_t *disp)
     lv_coord_t height = lv_obj_get_height(label_timer);
     lv_obj_align(label_timer, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 52 - (height / 2));
 
-    lv_obj_t *label_clock;
     /* create Clock label */
     label_clock = lv_label_create(scr);
     lv_label_set_text(label_clock, "00:00");
@@ -207,6 +210,8 @@ static void ui_init(lv_display_t *disp)
     lv_label_set_text(button_label, "Start");
     lv_obj_set_style_text_color(button_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(button_label, &lv_font_montserrat_20, 0);
+
+    prev_time = get_absolute_time();
 }
 
 int initialise_gui()
@@ -219,5 +224,14 @@ int initialise_gui()
 
 void tick_ui()
 {
+    const absolute_time_t curr_time = get_absolute_time();
+
+    if (curr_time - prev_time > 1000 * 1000) {
+        prev_time = curr_time;
+        time_sec++;
+        char time[10] = "";
+        snprintf(time, sizeof(time), "%02d:%02d", time_sec / 60, time_sec % 60);
+        lv_label_set_text(label_clock, time);
+    }
     lv_timer_handler();
 }
