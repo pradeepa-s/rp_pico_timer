@@ -187,13 +187,26 @@ static void ui_init(lv_display_t *disp)
     /* create Clock label */
     label_clock = lv_label_create(scr);
     lv_label_set_text(label_clock, "00:00");
-    lv_obj_set_style_text_color(label_clock, lv_color_white(), 0);
+    lv_obj_set_style_text_color(label_clock, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(label_clock, &lv_font_montserrat_46, 0);
     lv_obj_set_height(label_clock, LV_SIZE_CONTENT);
     lv_obj_set_width(label_clock, LV_SIZE_CONTENT);
     lv_obj_update_layout(label_clock);
     height = lv_obj_get_height(label_clock);
     lv_obj_align(label_clock, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 124 - (height / 2));
+
+    lv_obj_t *button = lv_button_create(scr);
+    lv_obj_align(button, LV_ALIGN_BOTTOM_MID, 0, -52);
+    lv_obj_set_style_bg_color(button, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_pad_top(button, UI_PROP_INTERNAL_PADDING_PX, 0);
+    lv_obj_set_style_pad_bottom(button, UI_PROP_INTERNAL_PADDING_PX, 0);
+    lv_obj_set_style_pad_left(button, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
+    lv_obj_set_style_pad_right(button, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
+
+    lv_obj_t *button_label = lv_label_create(button);
+    lv_label_set_text(button_label, "Start");
+    lv_obj_set_style_text_color(button_label, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_font(button_label, &lv_font_montserrat_20, 0);
 }
 
 int initialise_gui()

@@ -2,5 +2,6 @@
 #define _UI_PROPERTIES
 
 #define UI_PROP_BORDER_PADDING_PX    (16)
+#define UI_PROP_INTERNAL_PADDING_PX  (10)
 
 #endif   // _UI_PROPERTIES
