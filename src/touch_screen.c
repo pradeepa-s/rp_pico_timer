@@ -12,17 +12,24 @@
 #define GPIO_SPI1_SCK  (14)
 #define GPIO_SPI1_TX   (15)
 
-// The touch screen used is XPT2046.
+#define READING_MAX   (1800)
+#define READING_MIN   (200)
+#define X_RESOLUTION  (240)
+#define Y_RESOLUTION  (320)
+
+
+// The touch screen used is XPT2046. (But use ADS7846 datasheet to understand how things work.)
 // The working principle:
 //      - There are two conductive layers in a touch screen, one for X axis, and the other for Y axis.
 //      - Both axis have negative and positive terminals to apply voltage at either ends of the axis.
 //      - When someone touch the panel, the two layers shorts at the touch point.
 //      - Therefore, when we want to read X axis, apply voltage to the Y- and Y+ and then read X+ using the ADC.
 
-//          X <---   0, 0
+
+//          X <---   Origin
 //     ----------------
 //     |              |
-//     |              |
+//     |    SCREEN.   |
 //     |              |
 //     |              |
 //     |              |
@@ -40,13 +47,57 @@
 //  X = (240 * reading) / 1600
 //  Y = (320 * reading) / 1600
 
-static bool touch_detected = false;
+// Not sure why the reading is usually maxed at ~1800 and min at ~200. I was expecting it to go to 4096.
+// This is detected using manual testing. This might be different for each LEDS. Therefore some calibration
+// is needed.
 
-static int64_t enable_touch_interrupt(alarm_id_t id, void *user_data)
+static bool touch_detected = false;
+static touch_point_t last_touch = {};
+
+static int64_t alarm_cb_enable_touch_interrupt(alarm_id_t id, void *user_data)
 {
     touch_detected = false;
     gpio_set_irq_enabled(TOUCH_SCREEN_IRQ, GPIO_IRQ_EDGE_FALL, true);
     return 0;
+}
+
+static uint16_t sanitise_reading(const uint16_t reading, const uint16_t pixel_count,
+                                 const uint16_t max_reading, const uint16_t min_reading)
+{
+    uint16_t out_reading = reading;
+
+    // Clip the reading to range
+    out_reading = out_reading < min_reading ? min_reading : out_reading;
+    out_reading = out_reading > max_reading ? max_reading : out_reading;
+
+    // Adjust for min read error (This is the minimum reading we get when we touch the origin point)
+    out_reading -= min_reading;
+
+    // Convert reading to pixels
+    out_reading = (pixel_count * out_reading) / (max_reading - min_reading);
+
+    return out_reading;
+}
+
+static void queue_touch_point(const uint16_t x, const uint16_t y)
+{
+    if (x > 0 && y > 0)
+    {
+        last_touch.valid = true;
+        last_touch.x = x;
+        last_touch.y = y;
+
+        printf("Coord: (%d, %d)\n", x, y);
+    }
+}
+
+static uint16_t get_reading(const uint8_t* buffer)
+{
+    // Only the first 12 bits have valid data.
+    // Data is in the buffer MSB first.
+    uint16_t reading = (buffer[0] << 8) | buffer[1];
+    reading = reading >> 4;
+    return reading;
 }
 
 void touch_irq()
@@ -90,33 +141,30 @@ void tick_touch_screen()
         uint8_t buffer[2];
 
         spi_write_blocking(spi1, &read_y, sizeof(read_y));
-        sleep_ms(50); 
         spi_read_blocking(spi1, dummy, buffer, sizeof(buffer));
-        uint16_t y_reading = (buffer[0] << 8) | buffer[1];
-        y_reading = y_reading >> 4;
-        y_reading = y_reading < 200 ? 200 : y_reading;
-        y_reading = y_reading > 1800 ? 1800 : y_reading;
-        y_reading -= 200;
-        y_reading = (320 * y_reading) / 1600;
+        uint16_t reading_y = get_reading(buffer);
+        // printf("Y: %d\n", reading_y);
+        reading_y = sanitise_reading(reading_y, Y_RESOLUTION, READING_MAX, READING_MIN);
 
         spi_write_blocking(spi1, &read_x, sizeof(read_x));
-        sleep_ms(50); 
         spi_read_blocking(spi1, dummy, buffer, sizeof(buffer));
 
-        uint16_t reading_x = (buffer[0] << 8) | buffer[1];
-        reading_x = reading_x >> 4;
-        reading_x = reading_x < 200 ? 200 : reading_x;
-        reading_x = reading_x > 1800 ? 1800 : reading_x;
-        reading_x -= 200;
-        reading_x = (240 * reading_x) / 1600;
+        uint16_t reading_x = get_reading(buffer);
+        // printf("X: %d\n", reading_x);
+        reading_x = sanitise_reading(reading_x, X_RESOLUTION, READING_MAX, READING_MIN);
 
-        if (reading_x > 0 && y_reading > 0)
-        {
-            printf("Coord: (%d, %d)\n", reading_x, y_reading);
-        }
+        queue_touch_point(reading_x, reading_y);
         gpio_put(GPIO_SPI1_CSn, true);
 
-        add_alarm_in_ms(200, enable_touch_interrupt, NULL, true);
+        add_alarm_in_ms(200, alarm_cb_enable_touch_interrupt, NULL, true);
         touch_detected = false;
     }
 }
+
+touch_point_t get_touch_point()
+{
+    touch_point_t temp = last_touch;
+    last_touch.valid = false;
+    return temp;
+}
+
