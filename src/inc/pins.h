@@ -1,6 +1,8 @@
 #ifndef _PINS_H
 #define _PINS_H
 
+#include <stdint.h>
+
 const uint GPIO_LCD_BACKLIGHT_PIN = 2;
 const uint GPIO_LCD_DCX = 3;
 const uint GPIO_LCD_RESETn = 4;

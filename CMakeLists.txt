@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(water_reminder water_reminder.c )
+add_executable(water_reminder water_reminder.c)
 
 pico_set_program_name(water_reminder "water_reminder")
 pico_set_program_version(water_reminder "0.1")

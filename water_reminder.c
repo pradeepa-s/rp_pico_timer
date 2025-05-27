@@ -4,6 +4,7 @@
 #include "display_framework.h"
 #include "pico/cyw43_arch.h"
 #include "tick_count.h"
+#include "touch_screen.h"
 
 #define ONE_SECOND_MS  (1000)
 
@@ -27,6 +28,10 @@ int main()
     }
 
     {
+        init_touch_screen();
+    }
+
+    {
         const bool success = add_repeating_timer_ms(ONE_SECOND_MS, debug_messages_timer_cb, NULL, &debug_messages_timer);
         if (!success) {
             printf("ERROR: Failed to create debug messages timer.");
@@ -35,6 +40,7 @@ int main()
 
     while (true) {
         tick_ui();
+        tick_touch_screen();
     }
 }
 
