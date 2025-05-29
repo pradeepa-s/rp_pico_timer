@@ -15,6 +15,8 @@ void init_touch_screen();
 // The following functions must be executed in normal context.
 // They should never interrupt each other.
 void tick_touch_screen();
+
+// Read the last touch point. The last touch point is latching until released.
 touch_point_t get_touch_point();
 
 #endif   // _TOUCH_SCREEN_H

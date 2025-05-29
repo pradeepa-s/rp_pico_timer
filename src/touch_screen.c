@@ -51,13 +51,12 @@
 // This is detected using manual testing. This might be different for each LEDS. Therefore some calibration
 // is needed.
 
-static bool touch_detected = false;
-static touch_point_t last_touch = {};
+static bool read = false;
+static touch_point_t touch_point = {};
 
-static int64_t alarm_cb_enable_touch_interrupt(alarm_id_t id, void *user_data)
+static int64_t alarm_cb_continue_read(alarm_id_t id, void *user_data)
 {
-    touch_detected = false;
-    gpio_set_irq_enabled(TOUCH_SCREEN_IRQ, GPIO_IRQ_EDGE_FALL, true);
+    read = true;
     return 0;
 }
 
@@ -79,16 +78,21 @@ static uint16_t sanitise_reading(const uint16_t reading, const uint16_t pixel_co
     return out_reading;
 }
 
-static void queue_touch_point(const uint16_t x, const uint16_t y)
+static bool queue_if_valid(const touch_point_t tp)
 {
-    if (x > 0 && y > 0)
+    if (tp.x > 0 && tp.y > 0)
     {
-        last_touch.valid = true;
-        last_touch.x = x;
-        last_touch.y = y;
-
-        printf("Coord: (%d, %d)\n", x, y);
+        touch_point.valid = true;
+        touch_point.x = tp.x;
+        touch_point.y = tp.y;
+        // printf("Cord: %d:%d\n", tp.x, tp.y);
     }
+    else
+    {
+        touch_point.valid = false;
+        // printf("Rel\n");
+    }
+    return touch_point.valid;
 }
 
 static uint16_t get_reading(const uint8_t* buffer)
@@ -102,9 +106,11 @@ static uint16_t get_reading(const uint8_t* buffer)
 
 void touch_irq()
 {
+    // We don't enable interrupts until we detect the release. The release is detected by
+    // contnuously reading the touch sensor and evaluating the reading.
     gpio_acknowledge_irq(TOUCH_SCREEN_IRQ, GPIO_IRQ_EDGE_FALL);
     gpio_set_irq_enabled(TOUCH_SCREEN_IRQ, GPIO_IRQ_EDGE_FALL, false);
-    touch_detected = true;
+    read = true;
 }
 
 void init_touch_screen()
@@ -129,42 +135,56 @@ void init_touch_screen()
     gpio_put(GPIO_SPI1_CSn, true);
 }
 
+static touch_point_t read_touch_point()
+{
+    gpio_put(GPIO_SPI1_CSn, false);
+
+    const uint8_t dummy = 0x00;
+    const uint8_t read_y = 0b10010000;
+    const uint8_t read_x = 0b11010000;
+    uint8_t buffer[2];
+
+    spi_write_blocking(spi1, &read_y, sizeof(read_y));
+    spi_read_blocking(spi1, dummy, buffer, sizeof(buffer));
+    uint16_t reading_y = get_reading(buffer);
+    // printf("Y: %d\n", reading_y);
+    reading_y = sanitise_reading(reading_y, Y_RESOLUTION, READING_MAX, READING_MIN);
+
+    spi_write_blocking(spi1, &read_x, sizeof(read_x));
+    spi_read_blocking(spi1, dummy, buffer, sizeof(buffer));
+
+    uint16_t reading_x = get_reading(buffer);
+    // printf("X: %d\n", reading_x);
+    reading_x = sanitise_reading(reading_x, X_RESOLUTION, READING_MAX, READING_MIN);
+
+    touch_point_t tp = {.x = reading_x, .y = reading_y};
+    gpio_put(GPIO_SPI1_CSn, true);
+
+    return tp;
+}
+
 void tick_touch_screen()
 {
-    if (touch_detected)
-    {
-        gpio_put(GPIO_SPI1_CSn, false);
+    if (read) {
+        read = false;
 
-        const uint8_t dummy = 0x00;
-        const uint8_t read_y = 0b10010000;
-        const uint8_t read_x = 0b11010000;
-        uint8_t buffer[2];
+        // Read touch point
+        const touch_point_t tp = read_touch_point();
+        const bool is_valid = queue_if_valid(tp);
 
-        spi_write_blocking(spi1, &read_y, sizeof(read_y));
-        spi_read_blocking(spi1, dummy, buffer, sizeof(buffer));
-        uint16_t reading_y = get_reading(buffer);
-        // printf("Y: %d\n", reading_y);
-        reading_y = sanitise_reading(reading_y, Y_RESOLUTION, READING_MAX, READING_MIN);
-
-        spi_write_blocking(spi1, &read_x, sizeof(read_x));
-        spi_read_blocking(spi1, dummy, buffer, sizeof(buffer));
-
-        uint16_t reading_x = get_reading(buffer);
-        // printf("X: %d\n", reading_x);
-        reading_x = sanitise_reading(reading_x, X_RESOLUTION, READING_MAX, READING_MIN);
-
-        queue_touch_point(reading_x, reading_y);
-        gpio_put(GPIO_SPI1_CSn, true);
-
-        add_alarm_in_ms(200, alarm_cb_enable_touch_interrupt, NULL, true);
-        touch_detected = false;
+        if (is_valid) {
+            // If touch point is valid schedule another read in 200 ms.
+            add_alarm_in_ms(200, alarm_cb_continue_read, NULL, true);
+        }
+        else {
+            // If touch point is invalid, re-enable interrupts and stop reading.
+            gpio_set_irq_enabled(TOUCH_SCREEN_IRQ, GPIO_IRQ_EDGE_FALL, true);
+        }
     }
 }
 
 touch_point_t get_touch_point()
 {
-    touch_point_t temp = last_touch;
-    last_touch.valid = false;
-    return temp;
+    return touch_point;
 }
 

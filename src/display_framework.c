@@ -7,7 +7,12 @@
 #include "pins.h"
 #include "tick_count.h"
 #include "ui_properties.h"
+#include "touch_screen.h"
 
+
+// IMPROVEMENTS:
+//
+// - Remove dependency on the touch.
 
 static const bool LCD_CMD = false;
 static const bool LCD_DATA = true;
@@ -16,6 +21,7 @@ static const bool LCD_DATA = true;
 static bool pending_xfer = false;
 
 static lv_display_t *lcd_disp = NULL;
+static lv_indev_t *touch_panel = NULL;
 
 static const uint32_t LCD_H_RES = 240;
 static const uint32_t LCD_V_RES = 320;
@@ -24,6 +30,8 @@ static absolute_time_t prev_time = 0;
 static uint32_t time_sec = 0;
 
 static lv_obj_t *label_clock;
+
+static bool started = true;
 
 #ifdef ENABLE_REG_READ_FUNC
 // Can use this function to read register values for debugging.
@@ -43,6 +51,33 @@ void read_register(void)
     }
 }
 #endif
+
+static void button_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_RELEASED)
+    {
+        lv_obj_t *label = lv_event_get_user_data(e);
+        started = !started;
+        lv_label_set_text(label, started ? "Start" : "Stop");
+    }
+}
+
+static void read_touch(lv_indev_t *indev, lv_indev_data_t *data)
+{
+    touch_point_t tp = get_touch_point();
+
+    if (tp.valid)
+    {
+        data->point.x = tp.x;
+        data->point.y = tp.y;
+        data->state = LV_INDEV_STATE_PRESSED;
+    }
+    else
+    {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
+}
 
 static void initialise_lcd_hw()
 {
@@ -167,6 +202,11 @@ static void initialise_lvgl_framework()
     }
 
     lv_display_set_buffers(lcd_disp, buf1, buf2, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+
+    // Initialise touch screen connection
+    touch_panel = lv_indev_create();
+    lv_indev_set_type(touch_panel, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(touch_panel, read_touch);
 }
 
 static void ui_init(lv_display_t *disp)
@@ -211,6 +251,7 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_text_color(button_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(button_label, &lv_font_montserrat_20, 0);
 
+    lv_obj_add_event_cb(button, button_event_cb, LV_EVENT_RELEASED, button_label);
     prev_time = get_absolute_time();
 }
 
