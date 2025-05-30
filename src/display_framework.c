@@ -31,7 +31,7 @@ static uint32_t time_sec = 0;
 
 static lv_obj_t *label_clock;
 
-static bool started = true;
+static bool started = false;
 
 #ifdef ENABLE_REG_READ_FUNC
 // Can use this function to read register values for debugging.
@@ -55,11 +55,10 @@ void read_register(void)
 static void button_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_RELEASED)
-    {
+    if (code == LV_EVENT_RELEASED) {
         lv_obj_t *label = lv_event_get_user_data(e);
         started = !started;
-        lv_label_set_text(label, started ? "Start" : "Stop");
+        lv_label_set_text(label, started ? "Stop" : "Start");
     }
 }
 
@@ -67,14 +66,12 @@ static void read_touch(lv_indev_t *indev, lv_indev_data_t *data)
 {
     touch_point_t tp = get_touch_point();
 
-    if (tp.valid)
-    {
+    if (tp.valid) {
         data->point.x = tp.x;
         data->point.y = tp.y;
         data->state = LV_INDEV_STATE_PRESSED;
     }
-    else
-    {
+    else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
@@ -121,8 +118,7 @@ static void initialise_lcd_hw()
 
 static void send_lcd_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, const uint8_t *param, size_t param_size)
 {
-    if (!disp || !cmd)
-    {
+    if (!disp || !cmd) {
         return;
     }
 
@@ -133,8 +129,7 @@ static void send_lcd_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size
     spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     spi_write_blocking(spi0, cmd, cmd_size);
     
-    if (param)
-    {
+    if (param) {
         gpio_put(GPIO_LCD_DCX, LCD_DATA);
         spi_write_blocking(spi0, param, param_size);
     }
@@ -144,8 +139,7 @@ static void send_lcd_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size
 
 static void send_lcd_data(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, uint8_t *param, size_t param_size)
 {
-    if (!disp || !cmd)
-    {
+    if (!disp || !cmd) {
         return;
     }
 
@@ -157,8 +151,7 @@ static void send_lcd_data(lv_display_t *disp, const uint8_t *cmd, size_t cmd_siz
     spi_set_format(spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     spi_write_blocking(spi0, cmd, cmd_size);
     
-    if (param)
-    {
+    if (param) {
         // The data write is alwways 16 bits.
         // The data transfer is MSB first. Refer 8.8.42
         uint16_t* data = (uint16_t*)param;
@@ -189,13 +182,13 @@ static void initialise_lvgl_framework()
     // For partial rendering the buffer is set to 1/10th of display size
     const uint32_t buf_size = LCD_H_RES * LCD_V_RES * lv_color_format_get_size(lv_display_get_color_format(lcd_disp)) / 10;
     buf1 = lv_malloc(buf_size);
-    if (buf1 == NULL){
+    if (buf1 == NULL) {
         printf("Buffer1 allocation failed!\n\r");
         return;
     }
 
     buf2 = lv_malloc(buf_size);
-    if (buf2 == NULL){
+    if (buf2 == NULL) {
         printf("Buffer2 allocation failed!\n\r");
         lv_free(buf1);
         return;
@@ -238,21 +231,20 @@ static void ui_init(lv_display_t *disp)
     height = lv_obj_get_height(label_clock);
     lv_obj_align(label_clock, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 124 - (height / 2));
 
-    lv_obj_t *button = lv_button_create(scr);
-    lv_obj_align(button, LV_ALIGN_BOTTOM_MID, 0, -52);
-    lv_obj_set_style_bg_color(button, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(button, UI_PROP_INTERNAL_PADDING_PX, 0);
-    lv_obj_set_style_pad_bottom(button, UI_PROP_INTERNAL_PADDING_PX, 0);
-    lv_obj_set_style_pad_left(button, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
-    lv_obj_set_style_pad_right(button, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
+    lv_obj_t *start_stop_btn = lv_button_create(scr);
+    lv_obj_align(start_stop_btn, LV_ALIGN_BOTTOM_MID, 0, -52);
+    lv_obj_set_style_bg_color(start_stop_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_pad_top(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
+    lv_obj_set_style_pad_bottom(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
+    lv_obj_set_style_pad_left(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
+    lv_obj_set_style_pad_right(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
 
-    lv_obj_t *button_label = lv_label_create(button);
-    lv_label_set_text(button_label, "Start");
-    lv_obj_set_style_text_color(button_label, lv_color_hex(0xE0E0E0), 0);
-    lv_obj_set_style_text_font(button_label, &lv_font_montserrat_20, 0);
+    lv_obj_t *start_stop_label = lv_label_create(start_stop_btn);
+    lv_label_set_text(start_stop_label, "Start");
+    lv_obj_set_style_text_color(start_stop_label, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_font(start_stop_label, &lv_font_montserrat_20, 0);
 
-    lv_obj_add_event_cb(button, button_event_cb, LV_EVENT_RELEASED, button_label);
-    prev_time = get_absolute_time();
+    lv_obj_add_event_cb(start_stop_btn, button_event_cb, LV_EVENT_RELEASED, start_stop_label);
 }
 
 int initialise_gui()
@@ -260,19 +252,25 @@ int initialise_gui()
 	initialise_lcd_hw();
     initialise_lvgl_framework();
     ui_init(lcd_disp);
+    prev_time = get_absolute_time();
 	return 0;
 }
 
 void tick_ui()
 {
     const absolute_time_t curr_time = get_absolute_time();
-
-    if (curr_time - prev_time > 1000 * 1000) {
-        prev_time = curr_time;
-        time_sec++;
-        char time[10] = "";
-        snprintf(time, sizeof(time), "%02d:%02d", time_sec / 60, time_sec % 60);
-        lv_label_set_text(label_clock, time);
+    if (started) {
+        if (curr_time - prev_time > 1000 * 1000) {
+            prev_time = curr_time;
+            time_sec++;
+            char time[10] = "";
+            snprintf(time, sizeof(time), "%02d:%02d", time_sec / 60, time_sec % 60);
+            lv_label_set_text(label_clock, time);
+        }
     }
+    else {
+        prev_time = curr_time;
+    }
+
     lv_timer_handler();
 }
