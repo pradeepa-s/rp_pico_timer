@@ -32,6 +32,7 @@ static uint32_t time_sec = 0;
 static lv_obj_t *label_clock;
 
 static bool started = false;
+static bool reset = false;
 
 #ifdef ENABLE_REG_READ_FUNC
 // Can use this function to read register values for debugging.
@@ -52,13 +53,21 @@ void read_register(void)
 }
 #endif
 
-static void button_event_cb(lv_event_t *e)
+static void start_stop_button_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_RELEASED) {
         lv_obj_t *label = lv_event_get_user_data(e);
         started = !started;
         lv_label_set_text(label, started ? "Stop" : "Start");
+    }
+}
+
+static void reset_button_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_RELEASED) {
+        reset = true;
     }
 }
 
@@ -232,7 +241,7 @@ static void ui_init(lv_display_t *disp)
     lv_obj_align(label_clock, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 124 - (height / 2));
 
     lv_obj_t *start_stop_btn = lv_button_create(scr);
-    lv_obj_align(start_stop_btn, LV_ALIGN_BOTTOM_MID, 0, -52);
+    lv_obj_align(start_stop_btn, LV_ALIGN_BOTTOM_MID, 0, -78);
     lv_obj_set_style_bg_color(start_stop_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
     lv_obj_set_style_pad_bottom(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
@@ -244,7 +253,22 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_text_color(start_stop_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(start_stop_label, &lv_font_montserrat_20, 0);
 
-    lv_obj_add_event_cb(start_stop_btn, button_event_cb, LV_EVENT_RELEASED, start_stop_label);
+    lv_obj_add_event_cb(start_stop_btn, start_stop_button_event_cb, LV_EVENT_RELEASED, start_stop_label);
+
+    lv_obj_t *reset_btn = lv_button_create(scr);
+    lv_obj_align(reset_btn, LV_ALIGN_BOTTOM_MID, 0, -26);
+    lv_obj_set_style_bg_color(reset_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_pad_top(reset_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
+    lv_obj_set_style_pad_bottom(reset_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
+    lv_obj_set_style_pad_left(reset_btn, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
+    lv_obj_set_style_pad_right(reset_btn, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
+
+    lv_obj_t *reset_label = lv_label_create(reset_btn);
+    lv_label_set_text(reset_label, "Reset");
+    lv_obj_set_style_text_color(reset_label, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_font(reset_label, &lv_font_montserrat_20, 0);
+
+    lv_obj_add_event_cb(reset_btn, reset_button_event_cb, LV_EVENT_RELEASED, reset_label);
 }
 
 int initialise_gui()
@@ -256,16 +280,29 @@ int initialise_gui()
 	return 0;
 }
 
+void refresh_time()
+{
+    char time[10] = "";
+    snprintf(time, sizeof(time), "%02d:%02d", time_sec / 60, time_sec % 60);
+    lv_label_set_text(label_clock, time);
+}
+
 void tick_ui()
 {
     const absolute_time_t curr_time = get_absolute_time();
+
+    if (reset) {
+        prev_time = curr_time;
+        time_sec = 0;
+        reset = false;
+        refresh_time();
+    }
+
     if (started) {
         if (curr_time - prev_time > 1000 * 1000) {
             prev_time = curr_time;
             time_sec++;
-            char time[10] = "";
-            snprintf(time, sizeof(time), "%02d:%02d", time_sec / 60, time_sec % 60);
-            lv_label_set_text(label_clock, time);
+            refresh_time();
         }
     }
     else {
