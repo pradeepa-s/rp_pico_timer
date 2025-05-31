@@ -25,11 +25,13 @@ static const int HR_INCR = 1;
 static const int HR_DECR = 2;
 static const int MIN_INCR = 3;
 static const int MIN_DECR = 4;
+static const int SET_TIME = 5;
 
-static int hr_incr_event = 1;
-static int hr_decr_event = 2;
-static int min_incr_event = 3;
-static int min_decr_event = 4;
+static int hr_incr_event = HR_INCR;
+static int hr_decr_event = HR_DECR;
+static int min_incr_event = MIN_INCR;
+static int min_decr_event = MIN_DECR;
+static int set_time_event = SET_TIME;
 
 // Pending DMA transfer on SPI bus
 static bool pending_xfer = false;
@@ -40,15 +42,31 @@ static lv_indev_t *touch_panel = NULL;
 static const uint32_t LCD_H_RES = 240;
 static const uint32_t LCD_V_RES = 320;
 
-static absolute_time_t prev_time = 0;
-static uint32_t time_min = 0;
+static absolute_time_t prev_tick = 0;
+static uint32_t active_time_min = 0;
+static uint32_t set_time_min = 0;
+static uint32_t display_set_time = 0;
 
 static lv_obj_t *label_clock;
 
 static bool started = false;
 static bool reset = false;
-static bool incr_decr_event = 0;
 static bool refresh = false;
+
+typedef enum {
+    StartStopTime,
+    SetTime
+} ui_state_t;
+
+static ui_state_t ui_state = StartStopTime;
+
+static lv_obj_t *start_stop_btn = NULL;
+static lv_obj_t *reset_btn = NULL;
+static lv_obj_t *incr_hr_btn = NULL;
+static lv_obj_t *decr_hr_btn = NULL;
+static lv_obj_t *incr_min_btn = NULL;
+static lv_obj_t *decr_min_btn = NULL;
+static lv_obj_t *set_time_btn = NULL;
 
 #ifdef ENABLE_REG_READ_FUNC
 // Can use this function to read register values for debugging.
@@ -69,13 +87,35 @@ void read_register(void)
 }
 #endif
 
-static void incr_decr_cb(lv_event_t *e)
+static void show_screen()
+{
+    lv_obj_set_flag(incr_hr_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == StartStopTime));
+    lv_obj_set_flag(incr_min_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == StartStopTime));
+    lv_obj_set_flag(decr_hr_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == StartStopTime));
+    lv_obj_set_flag(decr_min_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == StartStopTime));
+    lv_obj_set_flag(set_time_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == StartStopTime));
+
+    lv_obj_set_flag(start_stop_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == SetTime));
+    lv_obj_set_flag(reset_btn, LV_OBJ_FLAG_HIDDEN, (ui_state == SetTime));
+
+}
+static void label_clock_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_RELEASED) {
+        ui_state = (ui_state == StartStopTime) ? SetTime : StartStopTime;
+        show_screen();
+        display_set_time = set_time_min;
+    }
+}
+
+static void set_time_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_RELEASED) {
         int *event = lv_event_get_user_data(e);
-        int hr = time_min / 60;
-        int min = time_min % 60;
+        int hr = display_set_time / 60;
+        int min = display_set_time % 60;
         if (event) {
             switch (*event) {
                 case HR_INCR:
@@ -94,13 +134,17 @@ static void incr_decr_cb(lv_event_t *e)
                     min = (min == 0) ? 60 : (min - 1);
                     refresh = true;
                 break;
-
+                case SET_TIME:
+                    set_time_min = display_set_time;
+                    ui_state = StartStopTime;
+                    show_screen();
+                break;
                 default:
                 break;
             };
         }
 
-        time_min = hr * 60 + min;
+        display_set_time = hr * 60 + min;
     }
 }
 
@@ -269,30 +313,37 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x1A1A1A), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_100, 0);
 
-    /* create Timer label */
-    lv_obj_t *label_timer = lv_label_create(scr);
-    lv_label_set_text(label_timer, "Timer");
-    lv_obj_set_style_text_color(label_timer, lv_color_white(), 0);
-    lv_obj_set_style_text_font(label_timer, &lv_font_montserrat_28, 0);
-    lv_obj_set_height(label_timer, LV_SIZE_CONTENT);
-    lv_obj_set_width(label_timer, LV_SIZE_CONTENT);
-    lv_obj_update_layout(label_timer);
-    lv_coord_t height = lv_obj_get_height(label_timer);
-    lv_obj_align(label_timer, LV_ALIGN_TOP_MID, 0, UI_PROP_BORDER_PADDING_PX + 52 - (height / 2));
-
     /* create Clock label */
     label_clock = lv_label_create(scr);
     lv_label_set_text(label_clock, "00:00");
     lv_obj_set_style_text_color(label_clock, lv_color_hex(0xE0E0E0), 0);
-    lv_obj_set_style_text_font(label_clock, &lv_font_montserrat_46, 0);
+    lv_obj_set_style_text_font(label_clock, &lv_font_montserrat_48, 0);
     lv_obj_set_height(label_clock, LV_SIZE_CONTENT);
     lv_obj_set_width(label_clock, LV_SIZE_CONTENT);
     lv_obj_update_layout(label_clock);
-    height = lv_obj_get_height(label_clock);
-    const int32_t timer_y_off = UI_PROP_BORDER_PADDING_PX + 124 - (height / 2);
+    int height = lv_obj_get_height(label_clock);
+    // Center of the top half of the display
+    const int32_t timer_y_off = (LCD_V_RES / 4) - (height / 2);
     lv_obj_align(label_clock, LV_ALIGN_TOP_MID, 0, timer_y_off);
+    lv_obj_set_flag(label_clock, LV_OBJ_FLAG_CLICKABLE, true);
+    lv_obj_add_event_cb(label_clock, label_clock_cb, LV_EVENT_RELEASED, NULL);
 
-    lv_obj_t *start_stop_btn = lv_button_create(scr);
+
+    /* Draw a line in the center */
+    static lv_style_t line_style;
+    lv_style_init(&line_style);
+    lv_style_set_line_width(&line_style, 3);
+    // TODO: Set line color
+    lv_style_set_line_color(&line_style, lv_color_hex(0xE0E0E0));
+    lv_style_set_line_rounded(&line_style, true);
+
+    lv_obj_t *center_line = lv_line_create(scr);
+    static lv_point_precise_t points[] = {{UI_PROP_BORDER_PADDING_PX, LCD_V_RES / 2}, {LCD_H_RES - UI_PROP_BORDER_PADDING_PX, LCD_V_RES / 2}};
+    lv_line_set_points(center_line, points, 2);
+    lv_obj_add_style(center_line, &line_style, 0);
+
+    // TODO: Fix offset
+    start_stop_btn = lv_button_create(scr);
     lv_obj_align(start_stop_btn, LV_ALIGN_BOTTOM_MID, 0, -78);
     lv_obj_set_style_bg_color(start_stop_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
@@ -307,7 +358,7 @@ static void ui_init(lv_display_t *disp)
 
     lv_obj_add_event_cb(start_stop_btn, start_stop_button_event_cb, LV_EVENT_RELEASED, start_stop_label);
 
-    lv_obj_t *reset_btn = lv_button_create(scr);
+    reset_btn = lv_button_create(scr);
     lv_obj_align(reset_btn, LV_ALIGN_BOTTOM_MID, 0, -26);
     lv_obj_set_style_bg_color(reset_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(reset_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
@@ -320,9 +371,9 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_text_color(reset_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(reset_label, &lv_font_montserrat_20, 0);
 
-    lv_obj_add_event_cb(reset_btn, reset_button_event_cb, LV_EVENT_RELEASED, reset_label);
+    lv_obj_add_event_cb(reset_btn, reset_button_event_cb, LV_EVENT_RELEASED, NULL);
 
-    lv_obj_t *incr_hr_btn = lv_button_create(scr);
+    incr_hr_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(incr_hr_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(incr_hr_btn, 4, 0);
     lv_obj_set_style_pad_bottom(incr_hr_btn, 4, 0);
@@ -330,17 +381,17 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_pad_right(incr_hr_btn, 8, 0);
 
     lv_obj_t *incr_hr_label = lv_label_create(incr_hr_btn);
-    lv_label_set_text(incr_hr_label, "+");
+    lv_label_set_text(incr_hr_label, "H+");
     lv_obj_set_style_text_color(incr_hr_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(incr_hr_label, &lv_font_montserrat_20, 0);
     lv_obj_update_layout(incr_hr_label);
     lv_obj_update_layout(incr_hr_btn);
     height = lv_obj_get_height(incr_hr_btn);
     int32_t width = lv_obj_get_width(incr_hr_btn);
-    lv_obj_align(incr_hr_btn, LV_ALIGN_TOP_LEFT, UI_PROP_BORDER_PADDING_PX, timer_y_off - height);
-    lv_obj_add_event_cb(incr_hr_btn, incr_decr_cb, LV_EVENT_RELEASED, &hr_incr_event);
+    lv_obj_align(incr_hr_btn, LV_ALIGN_BOTTOM_LEFT, UI_PROP_BORDER_PADDING_PX, -78);
+    lv_obj_add_event_cb(incr_hr_btn, set_time_cb, LV_EVENT_RELEASED, &hr_incr_event);
 
-    lv_obj_t *decr_hr_btn = lv_button_create(scr);
+    decr_hr_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(decr_hr_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(decr_hr_btn, 4, 0);
     lv_obj_set_style_pad_bottom(decr_hr_btn, 4, 0);
@@ -349,17 +400,17 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_width(decr_hr_btn, width);
 
     lv_obj_t *decr_hr_label = lv_label_create(decr_hr_btn);
-    lv_label_set_text(decr_hr_label, "-");
+    lv_label_set_text(decr_hr_label, "H-");
     lv_obj_set_align(decr_hr_label, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(decr_hr_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(decr_hr_label, &lv_font_montserrat_20, 0);
     lv_obj_update_layout(decr_hr_label);
     lv_obj_update_layout(decr_hr_btn);
     height = lv_obj_get_height(decr_hr_btn);
-    lv_obj_align(decr_hr_btn, LV_ALIGN_TOP_LEFT, UI_PROP_BORDER_PADDING_PX, timer_y_off + height);
-    lv_obj_add_event_cb(decr_hr_btn, incr_decr_cb, LV_EVENT_RELEASED, &hr_decr_event);
+    lv_obj_align(decr_hr_btn, LV_ALIGN_BOTTOM_LEFT, UI_PROP_BORDER_PADDING_PX, -26);
+    lv_obj_add_event_cb(decr_hr_btn, set_time_cb, LV_EVENT_RELEASED, &hr_decr_event);
 
-    lv_obj_t *incr_min_btn = lv_button_create(scr);
+    incr_min_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(incr_min_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(incr_min_btn, 4, 0);
     lv_obj_set_style_pad_bottom(incr_min_btn, 4, 0);
@@ -367,17 +418,17 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_pad_right(incr_min_btn, 8, 0);
 
     lv_obj_t *incr_min_label = lv_label_create(incr_min_btn);
-    lv_label_set_text(incr_min_label, "+");
+    lv_label_set_text(incr_min_label, "M+");
     lv_obj_set_style_text_color(incr_min_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(incr_min_label, &lv_font_montserrat_20, 0);
     lv_obj_update_layout(incr_min_label);
     lv_obj_update_layout(incr_min_btn);
     height = lv_obj_get_height(incr_min_btn);
     width = lv_obj_get_width(incr_min_btn);
-    lv_obj_align(incr_min_btn, LV_ALIGN_TOP_RIGHT, -UI_PROP_BORDER_PADDING_PX, timer_y_off - height);
-    lv_obj_add_event_cb(incr_min_btn, incr_decr_cb, LV_EVENT_RELEASED, &min_incr_event);
+    lv_obj_align(incr_min_btn, LV_ALIGN_BOTTOM_RIGHT, -UI_PROP_BORDER_PADDING_PX, -78);
+    lv_obj_add_event_cb(incr_min_btn, set_time_cb, LV_EVENT_RELEASED, &min_incr_event);
 
-    lv_obj_t *decr_min_btn = lv_button_create(scr);
+    decr_min_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(decr_min_btn, lv_color_hex(0x333333), 0);
     lv_obj_set_style_pad_top(decr_min_btn, 4, 0);
     lv_obj_set_style_pad_bottom(decr_min_btn, 4, 0);
@@ -386,15 +437,40 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_width(decr_min_btn, width);
 
     lv_obj_t *decr_min_label = lv_label_create(decr_min_btn);
-    lv_label_set_text(decr_min_label, "-");
+    lv_label_set_text(decr_min_label, "M-");
     lv_obj_set_align(decr_min_label, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(decr_min_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(decr_min_label, &lv_font_montserrat_20, 0);
     lv_obj_update_layout(decr_min_label);
     lv_obj_update_layout(decr_min_btn);
     height = lv_obj_get_height(decr_min_btn);
-    lv_obj_align(decr_min_btn, LV_ALIGN_TOP_RIGHT, -UI_PROP_BORDER_PADDING_PX, timer_y_off + height);
-    lv_obj_add_event_cb(decr_min_btn, incr_decr_cb, LV_EVENT_RELEASED, &min_decr_event);
+    lv_obj_align(decr_min_btn, LV_ALIGN_BOTTOM_RIGHT, -UI_PROP_BORDER_PADDING_PX, -26);
+    lv_obj_add_event_cb(decr_min_btn, set_time_cb, LV_EVENT_RELEASED, &min_decr_event);
+
+    set_time_btn = lv_button_create(scr);
+    lv_obj_set_style_bg_color(set_time_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_pad_top(set_time_btn, 4, 0);
+    lv_obj_set_style_pad_bottom(set_time_btn, 4, 0);
+    lv_obj_set_style_pad_left(set_time_btn, 8, 0);
+    lv_obj_set_style_pad_right(set_time_btn, 8, 0);
+    lv_obj_set_width(set_time_btn, width);
+
+    lv_obj_t *set_time_label = lv_label_create(set_time_btn);
+    lv_label_set_text(set_time_label, "Set");
+    lv_obj_set_align(set_time_label, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_color(set_time_label, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_font(set_time_label, &lv_font_montserrat_20, 0);
+    lv_obj_update_layout(set_time_label);
+    lv_obj_update_layout(set_time_btn);
+    height = lv_obj_get_height(set_time_btn);
+    lv_obj_align(set_time_btn, LV_ALIGN_CENTER, 0, LCD_V_RES / 4);
+    lv_obj_add_event_cb(set_time_btn, set_time_cb, LV_EVENT_RELEASED, &set_time_event);
+
+    lv_obj_set_flag(incr_hr_btn, LV_OBJ_FLAG_HIDDEN, true);
+    lv_obj_set_flag(incr_min_btn, LV_OBJ_FLAG_HIDDEN, true);
+    lv_obj_set_flag(decr_hr_btn, LV_OBJ_FLAG_HIDDEN, true);
+    lv_obj_set_flag(decr_min_btn, LV_OBJ_FLAG_HIDDEN, true);
+    lv_obj_set_flag(set_time_btn, LV_OBJ_FLAG_HIDDEN, true);
 }
 
 int initialise_gui()
@@ -402,14 +478,14 @@ int initialise_gui()
 	initialise_lcd_hw();
     initialise_lvgl_framework();
     ui_init(lcd_disp);
-    prev_time = get_absolute_time();
+    prev_tick = get_absolute_time();
 	return 0;
 }
 
-void refresh_time()
+void show_time(const uint32_t time_in_min)
 {
     char time[10] = "";
-    snprintf(time, sizeof(time), "%02d:%02d", time_min / 60, time_min % 60);
+    snprintf(time, sizeof(time), "%02d:%02d", time_in_min / 60, time_in_min % 60);
     lv_label_set_text(label_clock, time);
 }
 
@@ -417,29 +493,39 @@ void tick_ui()
 {
     const absolute_time_t curr_time = get_absolute_time();
 
-    if (reset) {
-        prev_time = curr_time;
-        time_min = 0;
-        reset = false;
-        refresh_time();
-    }
-
     if (started) {
-        if (curr_time - prev_time > 1000 * 1000) {
-            prev_time = curr_time;
+        if (curr_time - prev_tick > 1000 * 1000) {
+            prev_tick = curr_time;
 
-            time_min = (time_min > 0) ? (time_min - 1) : (24 * 60 - 1);
-            refresh_time();
+            active_time_min = (active_time_min > 0) ? (active_time_min - 1) : 0;
         }
     }
     else {
-        prev_time = curr_time;
+        prev_tick = curr_time;
+    }
 
-        if (refresh)
-        {
-            refresh_time();
-            refresh = false;
+    if (ui_state == StartStopTime) {
+        if (reset) {
+            prev_tick = curr_time;
+            active_time_min = set_time_min;
+            reset = false;
+            show_time(active_time_min);
         }
+
+        if (started) {
+            show_time(active_time_min);
+        }
+        else {
+            if (refresh)
+            {
+                active_time_min = set_time_min;
+                show_time(active_time_min);
+                refresh = false;
+            }
+        }
+    }
+    else {
+        show_time(display_set_time);
     }
 
     lv_timer_handler();
