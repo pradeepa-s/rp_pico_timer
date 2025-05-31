@@ -25,8 +25,8 @@
 //      - When someone touch the panel, the two layers shorts at the touch point.
 //      - Therefore, when we want to read X axis, apply voltage to the Y- and Y+ and then read X+ using the ADC.
 
-
-//          X <---   Origin
+//  Display          Touch
+//  Origin           Origin
 //     ----------------
 //     |              |
 //     |    SCREEN.   |
@@ -46,6 +46,8 @@
 //  Size of Y = 320
 //  X = (240 * reading) / 1600
 //  Y = (320 * reading) / 1600
+//
+//  The touch origin is converted to display origin here.
 
 // Not sure why the reading is usually maxed at ~1800 and min at ~200. I was expecting it to go to 4096.
 // This is detected using manual testing. This might be different for each LEDS. Therefore some calibration
@@ -83,7 +85,7 @@ static bool queue_if_valid(const touch_point_t tp)
     if (tp.x > 0 && tp.y > 0)
     {
         touch_point.valid = true;
-        touch_point.x = tp.x;
+        touch_point.x = X_RESOLUTION - tp.x;
         touch_point.y = tp.y;
         // printf("Cord: %d:%d\n", tp.x, tp.y);
     }
