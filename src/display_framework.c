@@ -13,8 +13,6 @@
 // IMPROVEMENTS:
 //
 // - Remove dependency on the touch.
-// - Too many buttons on display all the time.
-// - Timer to stop at 00 : 00.
 // - Start stop button colours.
 // - Colour theme
 
@@ -321,13 +319,12 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_height(label_clock, LV_SIZE_CONTENT);
     lv_obj_set_width(label_clock, LV_SIZE_CONTENT);
     lv_obj_update_layout(label_clock);
-    int height = lv_obj_get_height(label_clock);
+    const int clock_height = lv_obj_get_height(label_clock);
     // Center of the top half of the display
-    const int32_t timer_y_off = (LCD_V_RES / 4) - (height / 2);
+    const int32_t timer_y_off = (LCD_V_RES / 4) - (clock_height / 2);
     lv_obj_align(label_clock, LV_ALIGN_TOP_MID, 0, timer_y_off);
     lv_obj_set_flag(label_clock, LV_OBJ_FLAG_CLICKABLE, true);
     lv_obj_add_event_cb(label_clock, label_clock_cb, LV_EVENT_RELEASED, NULL);
-
 
     /* Draw a line in the center */
     static lv_style_t line_style;
@@ -342,22 +339,7 @@ static void ui_init(lv_display_t *disp)
     lv_line_set_points(center_line, points, 2);
     lv_obj_add_style(center_line, &line_style, 0);
 
-    // TODO: Fix offset
-    start_stop_btn = lv_button_create(scr);
-    lv_obj_align(start_stop_btn, LV_ALIGN_BOTTOM_MID, 0, -78);
-    lv_obj_set_style_bg_color(start_stop_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
-    lv_obj_set_style_pad_bottom(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX, 0);
-    lv_obj_set_style_pad_left(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
-    lv_obj_set_style_pad_right(start_stop_btn, UI_PROP_INTERNAL_PADDING_PX * 2, 0);
-
-    lv_obj_t *start_stop_label = lv_label_create(start_stop_btn);
-    lv_label_set_text(start_stop_label, "Start");
-    lv_obj_set_style_text_color(start_stop_label, lv_color_hex(0xE0E0E0), 0);
-    lv_obj_set_style_text_font(start_stop_label, &lv_font_montserrat_20, 0);
-
-    lv_obj_add_event_cb(start_stop_btn, start_stop_button_event_cb, LV_EVENT_RELEASED, start_stop_label);
-
+    // Reset button is the standard button for the start-stop screen
     reset_btn = lv_button_create(scr);
     lv_obj_align(reset_btn, LV_ALIGN_BOTTOM_MID, 0, -26);
     lv_obj_set_style_bg_color(reset_btn, lv_color_hex(0x333333), 0);
@@ -371,98 +353,87 @@ static void ui_init(lv_display_t *disp)
     lv_obj_set_style_text_color(reset_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(reset_label, &lv_font_montserrat_20, 0);
 
+    lv_obj_update_layout(reset_label);
+    lv_obj_update_layout(reset_btn);
+    const int reset_btn_height = lv_obj_get_height(reset_btn);
+    const int reset_btn_width = lv_obj_get_width(reset_btn);
     lv_obj_add_event_cb(reset_btn, reset_button_event_cb, LV_EVENT_RELEASED, NULL);
 
-    incr_hr_btn = lv_button_create(scr);
-    lv_obj_set_style_bg_color(incr_hr_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(incr_hr_btn, 4, 0);
-    lv_obj_set_style_pad_bottom(incr_hr_btn, 4, 0);
-    lv_obj_set_style_pad_left(incr_hr_btn, 8, 0);
-    lv_obj_set_style_pad_right(incr_hr_btn, 8, 0);
+    // TODO: Fix offset
+    start_stop_btn = lv_button_create(scr);
+    lv_obj_align(start_stop_btn, LV_ALIGN_BOTTOM_MID, 0, -78);
+    lv_obj_set_style_bg_color(start_stop_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_height(start_stop_btn, reset_btn_height);
+    lv_obj_set_width(start_stop_btn, reset_btn_width);
 
+    lv_obj_t *start_stop_label = lv_label_create(start_stop_btn);
+    lv_label_set_text(start_stop_label, "Start");
+    lv_obj_set_style_text_color(start_stop_label, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_font(start_stop_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_align(start_stop_label, LV_ALIGN_CENTER);
+    lv_obj_add_event_cb(start_stop_btn, start_stop_button_event_cb, LV_EVENT_RELEASED, start_stop_label);
+
+    int set_time_btn_width = (LCD_H_RES - UI_PROP_BORDER_PADDING_PX * 2 - UI_PROP_INTERNAL_PADDING_PX * 2);
+    set_time_btn_width = set_time_btn_width / 3;
+
+    incr_hr_btn = lv_button_create(scr);
     lv_obj_t *incr_hr_label = lv_label_create(incr_hr_btn);
     lv_label_set_text(incr_hr_label, "H+");
     lv_obj_set_style_text_color(incr_hr_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(incr_hr_label, &lv_font_montserrat_20, 0);
-    lv_obj_update_layout(incr_hr_label);
-    lv_obj_update_layout(incr_hr_btn);
-    height = lv_obj_get_height(incr_hr_btn);
-    int32_t width = lv_obj_get_width(incr_hr_btn);
+    lv_obj_set_style_bg_color(incr_hr_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_align(incr_hr_label, LV_ALIGN_CENTER);
+    lv_obj_set_width(incr_hr_btn, set_time_btn_width);
+    lv_obj_set_height(incr_hr_btn, reset_btn_height);
     lv_obj_align(incr_hr_btn, LV_ALIGN_BOTTOM_LEFT, UI_PROP_BORDER_PADDING_PX, -78);
     lv_obj_add_event_cb(incr_hr_btn, set_time_cb, LV_EVENT_RELEASED, &hr_incr_event);
 
     decr_hr_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(decr_hr_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(decr_hr_btn, 4, 0);
-    lv_obj_set_style_pad_bottom(decr_hr_btn, 4, 0);
-    lv_obj_set_style_pad_left(decr_hr_btn, 8, 0);
-    lv_obj_set_style_pad_right(decr_hr_btn, 8, 0);
-    lv_obj_set_width(decr_hr_btn, width);
-
     lv_obj_t *decr_hr_label = lv_label_create(decr_hr_btn);
     lv_label_set_text(decr_hr_label, "H-");
     lv_obj_set_align(decr_hr_label, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(decr_hr_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(decr_hr_label, &lv_font_montserrat_20, 0);
-    lv_obj_update_layout(decr_hr_label);
-    lv_obj_update_layout(decr_hr_btn);
-    height = lv_obj_get_height(decr_hr_btn);
     lv_obj_align(decr_hr_btn, LV_ALIGN_BOTTOM_LEFT, UI_PROP_BORDER_PADDING_PX, -26);
+    lv_obj_set_width(decr_hr_btn, set_time_btn_width);
+    lv_obj_set_height(decr_hr_btn, reset_btn_height);
     lv_obj_add_event_cb(decr_hr_btn, set_time_cb, LV_EVENT_RELEASED, &hr_decr_event);
 
     incr_min_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(incr_min_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(incr_min_btn, 4, 0);
-    lv_obj_set_style_pad_bottom(incr_min_btn, 4, 0);
-    lv_obj_set_style_pad_left(incr_min_btn, 8, 0);
-    lv_obj_set_style_pad_right(incr_min_btn, 8, 0);
-
+    lv_obj_set_width(incr_min_btn, set_time_btn_width);
+    lv_obj_set_height(incr_min_btn, reset_btn_height);
     lv_obj_t *incr_min_label = lv_label_create(incr_min_btn);
     lv_label_set_text(incr_min_label, "M+");
     lv_obj_set_style_text_color(incr_min_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(incr_min_label, &lv_font_montserrat_20, 0);
-    lv_obj_update_layout(incr_min_label);
-    lv_obj_update_layout(incr_min_btn);
-    height = lv_obj_get_height(incr_min_btn);
-    width = lv_obj_get_width(incr_min_btn);
+    lv_obj_set_align(incr_min_label, LV_ALIGN_CENTER);
     lv_obj_align(incr_min_btn, LV_ALIGN_BOTTOM_RIGHT, -UI_PROP_BORDER_PADDING_PX, -78);
     lv_obj_add_event_cb(incr_min_btn, set_time_cb, LV_EVENT_RELEASED, &min_incr_event);
 
     decr_min_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(decr_min_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(decr_min_btn, 4, 0);
-    lv_obj_set_style_pad_bottom(decr_min_btn, 4, 0);
-    lv_obj_set_style_pad_left(decr_min_btn, 8, 0);
-    lv_obj_set_style_pad_right(decr_min_btn, 8, 0);
-    lv_obj_set_width(decr_min_btn, width);
-
+    lv_obj_set_width(decr_min_btn, set_time_btn_width);
+    lv_obj_set_height(decr_min_btn, reset_btn_height);
     lv_obj_t *decr_min_label = lv_label_create(decr_min_btn);
     lv_label_set_text(decr_min_label, "M-");
     lv_obj_set_align(decr_min_label, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(decr_min_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(decr_min_label, &lv_font_montserrat_20, 0);
-    lv_obj_update_layout(decr_min_label);
-    lv_obj_update_layout(decr_min_btn);
-    height = lv_obj_get_height(decr_min_btn);
     lv_obj_align(decr_min_btn, LV_ALIGN_BOTTOM_RIGHT, -UI_PROP_BORDER_PADDING_PX, -26);
     lv_obj_add_event_cb(decr_min_btn, set_time_cb, LV_EVENT_RELEASED, &min_decr_event);
 
     set_time_btn = lv_button_create(scr);
     lv_obj_set_style_bg_color(set_time_btn, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_top(set_time_btn, 4, 0);
-    lv_obj_set_style_pad_bottom(set_time_btn, 4, 0);
-    lv_obj_set_style_pad_left(set_time_btn, 8, 0);
-    lv_obj_set_style_pad_right(set_time_btn, 8, 0);
-    lv_obj_set_width(set_time_btn, width);
+    lv_obj_set_width(set_time_btn, set_time_btn_width);
+    lv_obj_set_height(set_time_btn, reset_btn_height);
 
     lv_obj_t *set_time_label = lv_label_create(set_time_btn);
     lv_label_set_text(set_time_label, "Set");
     lv_obj_set_align(set_time_label, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(set_time_label, lv_color_hex(0xE0E0E0), 0);
     lv_obj_set_style_text_font(set_time_label, &lv_font_montserrat_20, 0);
-    lv_obj_update_layout(set_time_label);
-    lv_obj_update_layout(set_time_btn);
-    height = lv_obj_get_height(set_time_btn);
     lv_obj_align(set_time_btn, LV_ALIGN_CENTER, 0, LCD_V_RES / 4);
     lv_obj_add_event_cb(set_time_btn, set_time_cb, LV_EVENT_RELEASED, &set_time_event);
 
