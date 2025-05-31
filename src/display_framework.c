@@ -13,6 +13,10 @@
 // IMPROVEMENTS:
 //
 // - Remove dependency on the touch.
+// - Too many buttons on display all the time.
+// - Timer to stop at 00 : 00.
+// - Start stop button colours.
+// - Colour theme
 
 static const bool LCD_CMD = false;
 static const bool LCD_DATA = true;
