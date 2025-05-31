@@ -1,3 +1,5 @@
+#include <src/misc/lv_color.h>
+#include <src/misc/lv_palette.h>
 #include <stdio.h>
 #include "display_framework.h"
 #include "lvgl.h"
@@ -50,6 +52,8 @@ static lv_obj_t *label_clock;
 static bool started = false;
 static bool reset = false;
 static bool refresh = false;
+
+static bool red = false;
 
 typedef enum {
     StartStopTime,
@@ -153,6 +157,8 @@ static void start_stop_button_event_cb(lv_event_t *e)
         lv_obj_t *label = lv_event_get_user_data(e);
         started = !started;
         lv_label_set_text(label, started ? "Stop" : "Start");
+        lv_obj_set_style_text_color(label_clock, lv_color_hex(0xE0E0E0), 0);
+        red = false;
     }
 }
 
@@ -469,6 +475,12 @@ void tick_ui()
             prev_tick = curr_time;
 
             active_time_min = (active_time_min > 0) ? (active_time_min - 1) : 0;
+
+            if (active_time_min == 0) {
+                red = !red;
+                lv_color_t color = red ? lv_palette_main(LV_PALETTE_RED) : lv_color_hex(0xE0E0E0);
+                lv_obj_set_style_text_color(label_clock, color, 0);
+            }
         }
     }
     else {
