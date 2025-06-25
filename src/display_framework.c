@@ -492,6 +492,8 @@ void tick_ui()
             prev_tick = curr_time;
             active_time_min = set_time_min;
             reset = false;
+            lv_color_t color = lv_color_hex(0xE0E0E0);
+            lv_obj_set_style_text_color(label_clock, color, 0);
             show_time(active_time_min);
         }
 

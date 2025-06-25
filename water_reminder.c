@@ -3,7 +3,6 @@
 #include "pico/stdlib.h"
 #include "debug_messages.h"
 #include "display_framework.h"
-#include "pico/cyw43_arch.h"
 #include "tick_count.h"
 #include "touch_screen.h"
 
@@ -16,9 +15,6 @@ static bool debug_messages_timer_cb(repeating_timer_t *rt);
 int main()
 {
     stdio_init_all();
-
-    cyw43_arch_init();
-
     setup_isr();
 
     {

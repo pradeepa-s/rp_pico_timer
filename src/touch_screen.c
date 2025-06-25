@@ -119,6 +119,7 @@ void init_touch_screen()
 {
     gpio_init(TOUCH_SCREEN_IRQ);
     gpio_set_dir(TOUCH_SCREEN_IRQ, false);
+    irq_set_enabled(IO_IRQ_BANK0, true);
     gpio_add_raw_irq_handler(TOUCH_SCREEN_IRQ, touch_irq);
 
     gpio_init(GPIO_SPI1_CSn);  // Software controlled
