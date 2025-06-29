@@ -41,7 +41,9 @@
         "stdlib.h": "c",
         "tick_count.h": "c",
         "pins.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "spi.h": "c",
+        "battery_monitor.h": "c"
     },
     "search.useIgnoreFiles": true
 }
